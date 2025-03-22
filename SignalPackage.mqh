@@ -43,6 +43,11 @@ public:
     int              Signals(CSignal &array[]);
     int              Positions(CSignal &array[]);
     int              History(CSignal &array[]);
+    //--- Functions for controlling work with signal package
+    bool             Create(const string symbol_name,const ENUM_ORDER_TYPE type,const double volume,const double price,const double sl,const double tp,const int max_spread,const int max_slip,const string comment,CChartData *chart_data_obj,CTrailing *trail_obj);
+    virtual bool     Opening(void);
+    virtual bool     Trailing(void);
+    virtual bool     Closing(void);
    };
 //+------------------------------------------------------------------+
 //| Constructor                                                      |
@@ -131,5 +136,72 @@ int CSignalPackage::History(CSignal &array[])
         array[i] = m_history[i];
        }
     return(m_history_total);
+   }
+//+------------------------------------------------------------------+
+//| Create signal package                                            |
+//+------------------------------------------------------------------+
+bool CSignalPackage::Create(const string symbol_name,const ENUM_ORDER_TYPE type,const double volume,const double price,const double sl,const double tp,const int max_spread,const int max_slip,const string comment,CChartData *chart_data_obj,CTrailing *trail_obj)
+   {
+//--- check signals total
+    if(m_signals_total > 0)
+        return(false);
+//--- resize signals array
+    ArrayResize(m_signals,1);
+//--- create signal
+    m_signals[0] = CSignal(m_trade);
+    if(!m_signals[0].Create(symbol_name,type,price,max_spread,max_slip,comment,chart_data_obj))
+        return(false);
+    if(m_signals[0].Sub(volume,sl,tp,trail_obj) < 0)
+        return(false);
+    return(true);
+   }
+//+------------------------------------------------------------------+
+//| Opening                                                          |
+//+------------------------------------------------------------------+
+bool CSignalPackage::Opening(void)
+   {
+    bool change = false;
+//--- opening signals array
+    for(int i = m_signals_total; i >= 0; i--)
+       {
+        //--- opening signal
+        if(m_signals[i].Opening())
+            //--- moving signal to positions array
+            if(Move(m_positions,m_signals,i) >= 0)
+                change = true;
+       }
+    return(change);
+   }
+//+------------------------------------------------------------------+
+//| Trailing                                                         |
+//+------------------------------------------------------------------+
+bool CSignalPackage::Trailing(void)
+   {
+    bool change = false;
+//--- trailing positions array
+    for(int i = m_positions_total; i >= 0; i--)
+       {
+        //--- trailing position
+        if(m_positions[i].Trailing())
+            change = true;
+       }
+    return(change);
+   }
+//+------------------------------------------------------------------+
+//| Closing                                                          |
+//+------------------------------------------------------------------+
+bool CSignalPackage::Closing(void)
+   {
+    bool change = false;
+//--- closing positions array
+    for(int i = m_positions_total; i >= 0; i--)
+       {
+        //--- closing position
+        if(m_positions[i].Closing())
+            //--- moving position to history array
+            if(Move(m_history,m_positions,i) >= 0)
+                change = true;
+       }
+    return(change);
    }
 //+------------------------------------------------------------------+
